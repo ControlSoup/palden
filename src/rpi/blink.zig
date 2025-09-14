@@ -22,7 +22,7 @@ const ISM_IMU: c_int = 0x6a;
 
 // Accelerometer Settings (4g)
 const ISM_ACCEL_CTRL1_XL: c_int = 0x10;
-const ISM_ACCEL_CTRL1_XL_SET: c_int = 0b10101000;
+const ISM_ACCEL_CTRL1_XL_SET: c_int = 0b101011111;
 
 // Accelerometer Read
 const ISM_ACCEL_OUTX_L_A: c_int = 0x28;
@@ -38,6 +38,7 @@ const ISM_GRYO_OUTX_L_G: c_int = 0x22;
 const ISM_GRYO_OUTY_L_G: c_int = 0x24;
 const ISM_GRYO_OUTZ_L_G: c_int = 0x26;
 
+const ISM_WHO_AM_I: c_int = 0x0F;
 var ISM_IMU_FILE: c_int = c.INT_MAX;
 fn init_ism_imu() !void {
     var res: c_int = c.wiringPiI2CSetup(ISM_IMU);
@@ -45,7 +46,6 @@ fn init_ism_imu() !void {
         std.log.err("init_ism_imu() FAILED with code {d}", .{res});
         return error.InitIsmImu;
     }
-
     ISM_IMU_FILE = res;
 
     res = c.wiringPiI2CWriteReg8(ISM_IMU_FILE, ISM_ACCEL_CTRL1_XL, ISM_ACCEL_CTRL1_XL_SET);
