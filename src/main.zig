@@ -28,7 +28,7 @@ pub fn main() !void {
         buffer.record() catch |err| {
             std.log.err("{}", .{err});
         };
-        std.log.info("START-BUFFER_END:{d}", .{timer.read()});
+        std.log.info("START-BUFFER_FILE:{d}", .{timer.read()});
     }
     buffer.buffer_stop_recording() catch |err| {
         std.log.err("{}", .{err});
