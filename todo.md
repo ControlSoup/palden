@@ -1,0 +1,1 @@
+- [ ] IO is currently the limter for cycle speed, need to interupt sensors!

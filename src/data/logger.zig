@@ -1,4 +1,5 @@
 const std = @import("std");
+const fba = @import("../fba.zig");
 
 const CONFIG_FILE_NAME: []const u8 = "config/data_info.json";
 
@@ -30,9 +31,8 @@ pub fn start_recording() !void {
     config_read.close();
 
     // Parse the contents of the config file
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var pre_allocated = std.heap.FixedBufferAllocator.init(&fba.pre_allocated_data);
+    const allocator = pre_allocated.allocator();
 
     const parsed: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(
         std.json.Value,

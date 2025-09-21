@@ -30,17 +30,26 @@ pub fn setup() !void {
 
     try ism330dlc.init_ism_imu(IMU);
     try ism330dlc.log_settings();
-    // ism330dlc.calibrate(1000);
 
     c.pinMode(LED, c.OUTPUT);
 }
 
 pub fn update_io() void {
-    const reading: ism330dlc.ImuReading = ism330dlc.read();
-    buffer.write_float(.gryo_x, reading.gx);
-    buffer.write_float(.gryo_y, reading.gy);
-    buffer.write_float(.gryo_z, reading.gz);
-    buffer.write_float(.accel_x, reading.ax);
-    buffer.write_float(.accel_y, reading.ay);
-    buffer.write_float(.accel_z, reading.az);
+    const is = ism330dlc.is_imu_ready();
+
+    std.log.info("Ready: {}, {}", .{ is.accel_ready, is.gryo_ready });
+
+    if (is.accel_ready) {
+        const accel = ism330dlc.read_accel();
+        buffer.write_float(.accel_x, accel.ax);
+        buffer.write_float(.accel_y, accel.ay);
+        buffer.write_float(.accel_z, accel.az);
+    }
+
+    if (is.gryo_ready) {
+        const gryo = ism330dlc.read_gryo();
+        buffer.write_float(.gryo_x, gryo.gx);
+        buffer.write_float(.gryo_y, gryo.gy);
+        buffer.write_float(.gryo_z, gryo.gz);
+    }
 }

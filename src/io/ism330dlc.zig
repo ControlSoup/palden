@@ -17,6 +17,8 @@ const GRYO_OUTX_L_G: c_int = 0x22;
 const GRYO_OUTY_L_G: c_int = 0x24;
 const GRYO_OUTZ_L_G: c_int = 0x26;
 
+const STATUS_REG: c_int = 0x1E;
+
 // Accelerometer Settings (4g) 3.3khz
 const ACCEL_CTRL1_XL: c_int = 0x10;
 const ACCEL_CTRL1_XL_SET: c_int = 0b10011000;
@@ -82,15 +84,6 @@ pub fn log_settings() !void {
     std.log.info("GRYO_Z_TARE: {d}", .{GRYO_Z_TARE});
 }
 
-pub const ImuReading = struct {
-    gx: f32,
-    gy: f32,
-    gz: f32,
-    ax: f32,
-    ay: f32,
-    az: f32,
-};
-
 pub fn calibrate(n: u16) void {
     var gx_avg: c_int = 0.0;
     var gy_avg: c_int = 0.0;
@@ -131,19 +124,36 @@ pub fn calibrate(n: u16) void {
     std.log.info("ACCEL_Y_TARE: {d}", .{ACCEL_Z_TARE});
 }
 
-// NOTE: THERE IS NO ERROR HANDLING? Probs bad.... :)
-pub fn read() ImuReading {
+pub fn is_imu_ready() struct { accel_ready: bool, gryo_ready: bool } {
+    const status: c_int = c.wiringPiI2CReadReg8(FILE, STATUS_REG);
+
+    const accel_bitop: c_int = status & 1;
+    const gryo_bitop: c_int = status & 2;
+
+    return .{
+        .accel_ready = accel_bitop == 1,
+        .gryo_ready = gryo_bitop == 2,
+    };
+}
+
+pub fn read_gryo() struct { gx: f32, gy: f32, gz: f32 } {
     const lsb_gx: c_int = c.wiringPiI2CReadReg16(FILE, GRYO_OUTX_L_G);
     const lsb_gy: c_int = c.wiringPiI2CReadReg16(FILE, GRYO_OUTY_L_G);
     const lsb_gz: c_int = c.wiringPiI2CReadReg16(FILE, GRYO_OUTZ_L_G);
+
+    return .{
+        .gx = @as(f32, @floatFromInt(lsb_gx)) * GRYO_LSB_TO_DEGPS - GRYO_X_TARE,
+        .gy = @as(f32, @floatFromInt(lsb_gy)) * GRYO_LSB_TO_DEGPS - GRYO_Y_TARE,
+        .gz = @as(f32, @floatFromInt(lsb_gz)) * GRYO_LSB_TO_DEGPS - GRYO_Z_TARE,
+    };
+}
+
+pub fn read_accel() struct { ax: f32, ay: f32, az: f32 } {
     const lsb_ax: c_int = c.wiringPiI2CReadReg16(FILE, ACCEL_OUTX_L_A);
     const lsb_ay: c_int = c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A);
     const lsb_az: c_int = c.wiringPiI2CReadReg16(FILE, ACCEL_OUTZ_L_A);
 
-    return ImuReading{
-        .gx = @as(f32, @floatFromInt(lsb_gx)) * GRYO_LSB_TO_DEGPS - GRYO_X_TARE,
-        .gy = @as(f32, @floatFromInt(lsb_gy)) * GRYO_LSB_TO_DEGPS - GRYO_Y_TARE,
-        .gz = @as(f32, @floatFromInt(lsb_gz)) * GRYO_LSB_TO_DEGPS - GRYO_Z_TARE,
+    return .{
         .ax = @as(f32, @floatFromInt(lsb_ax)) * ACCEL_LSB_TO_G - ACCEL_X_TARE,
         .ay = @as(f32, @floatFromInt(lsb_ay)) * ACCEL_LSB_TO_G - ACCEL_Y_TARE,
         .az = @as(f32, @floatFromInt(lsb_az)) * ACCEL_LSB_TO_G - ACCEL_Z_TARE,
