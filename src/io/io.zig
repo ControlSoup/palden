@@ -30,6 +30,7 @@ pub fn setup() !void {
 
     try ism330dlc.init_ism_imu(IMU);
     try ism330dlc.log_settings();
+    ism330dlc.calibrate(500);
 
     c.pinMode(LED, c.OUTPUT);
 }
@@ -37,8 +38,7 @@ pub fn setup() !void {
 pub fn update_io() void {
     const is = ism330dlc.is_imu_ready();
 
-    std.log.info("Ready: {}, {}", .{ is.accel_ready, is.gryo_ready });
-
+    // NOTE: ~900hz upper limit
     if (is.accel_ready) {
         const accel = ism330dlc.read_accel();
         buffer.write_float(.accel_x, accel.ax);
