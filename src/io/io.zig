@@ -4,10 +4,12 @@ pub const ism330dlc = @import("ism330dlc.zig");
 const c = @cImport({
     @cInclude("limits.h");
     @cInclude("wiringPi.h");
+    @cInclude("softPwm.h");
     @cInclude("wiringPiI2C.h");
 });
 
 const LED: c_uint = 7;
+const PWM: c_uint = 26;
 const IMU: c_int = 0x6a;
 
 //      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
@@ -22,9 +24,9 @@ const IMU: c_int = 0x6a;
 //
 
 pub fn setup() !void {
-    const res: c_int = c.wiringPiSetup();
+    var res: c_int = c.wiringPiSetup();
     if (res != 0) {
-        std.log.err("wriingPiSetup() FAILED with code {d}", .{res});
+        std.log.err("wiringPiSetup() FAILED with code {d}", .{res});
         return error.WiringPiSetup;
     }
 
@@ -33,8 +35,18 @@ pub fn setup() !void {
     ism330dlc.calibrate(500);
 
     c.pinMode(LED, c.OUTPUT);
+    res = c.softPwmCreate(PWM, 0, 100);
+    if (res != 0) {
+        std.log.err("Unable to create a software PWM on pin {d}", .{PWM});
+    }
 }
 
+pub fn frac_to_servo(frac: f32) c_int {
+    const command = @min(@max(frac, 0.0), 1.0) * 100;
+    return @as(c_int, @intFromFloat(command));
+}
+
+// NOTE: Runs once per event cycle
 pub fn update_io() void {
     const is = ism330dlc.is_imu_ready();
 
@@ -52,4 +64,5 @@ pub fn update_io() void {
         buffer.write_float(.gryo_y, gryo.gy);
         buffer.write_float(.gryo_z, gryo.gz);
     }
+    c.softPwmWrite(PWM, frac_to_servo(buffer.read_float(.servo)));
 }

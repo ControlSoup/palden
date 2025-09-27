@@ -21,6 +21,7 @@ pub const FLOAT_IDXS = enum(usize) {
     gryo_x,
     gryo_y,
     gryo_z,
+    servo,
 };
 
 var ints_data = [1]i32{0.0} ** std.meta.fields(INT_IDXS).len;
@@ -86,6 +87,6 @@ pub fn record() !void {
     try logger.write_line(values);
 }
 
-pub fn buffer_stop_recording() !void {
+pub fn stop_recording() !void {
     try logger.stop_recording();
 }

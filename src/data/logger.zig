@@ -89,6 +89,8 @@ pub fn start_recording() !void {
     _ = try DATA_FILE.write("");
 
     IS_RECORDING = true;
+
+    std.log.info("Started Logging: {s}-{d}.csv", .{ PREFIX, ID });
 }
 
 pub fn write_line(line: []u8) !void {
@@ -98,4 +100,5 @@ pub fn write_line(line: []u8) !void {
 pub fn stop_recording() !void {
     DATA_FILE.close();
     IS_RECORDING = false;
+    std.log.info("Stopped Logging", .{});
 }

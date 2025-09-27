@@ -30,6 +30,8 @@ pub fn main() !void {
     var timer: std.time.Timer = try std.time.Timer.start();
     try io.setup();
 
+    buffer.write_float(.servo, 0.0);
+
     // ERROR FREE ZONE
     var loop_timer: std.time.Timer = try std.time.Timer.start();
     while (true) {
@@ -47,12 +49,22 @@ pub fn main() !void {
     };
 }
 
+pub fn sin_centered(time: f32, time_offset: f32, center: f32, hz: f32, amp: f32) f32 {
+    return amp * @sin((time - time_offset) * 2.0 * std.math.pi * hz) + center;
+}
+
+var s1: bool = true;
 fn loop_events() void {
     const time: f32 = buffer.read_float(.time);
 
-    if (time >= 5.0 and time <= 15.0) {
-        buffer.record() catch |err| {
-            std.log.err("{}", .{err});
-        };
+    if (time < 2.0) {
+        buffer.write_float(.servo, 0.2);
+    } else if (time < 2.0) {
+        buffer.write_float(.servo, 0.5);
+    } else {
+        buffer.write_float(.servo, sin_centered(time, 2.0, 0.5, 0.2, 0.5));
     }
+    buffer.record() catch |err| {
+        std.log.err("{}", .{err});
+    };
 }
