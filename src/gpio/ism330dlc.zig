@@ -1,4 +1,5 @@
 const std = @import("std");
+const buffer = @import("../data/buffer.zig");
 const c = @cImport({
     @cInclude("limits.h");
     @cInclude("wiringPi.h");
@@ -12,26 +13,26 @@ const ACCEL_OUTX_L_A: c_int = 0x28;
 const ACCEL_OUTY_L_A: c_int = 0x2A;
 const ACCEL_OUTZ_L_A: c_int = 0x2C;
 
-// GRYO Scope Read
-const GRYO_OUTX_L_G: c_int = 0x22;
-const GRYO_OUTY_L_G: c_int = 0x24;
-const GRYO_OUTZ_L_G: c_int = 0x26;
-
 const STATUS_REG: c_int = 0x1E;
 
-// Accelerometer Settings (4g) 3.3khz
+// Accelerometer Settings (4g)
 const ACCEL_CTRL1_XL: c_int = 0x10;
-const ACCEL_CTRL1_XL_SET: c_int = 0b10011000;
+const ACCEL_CTRL1_XL_SET: c_int = 0b10101000;
 const ACCEL_LSB_TO_G: f16 = 0.000122;
 
 const ACCEL_X_OFS_USR: c_int = 0x73;
 const ACCEL_Y_OFS_USR: c_int = 0x74;
 const ACCEL_Z_OFS_USR: c_int = 0x75;
 
-// Gyroscope Settings (250dps) 3.3khz
+// Gyroscope Settings (250dps)
 const GRYO_CTRL2_G: c_int = 0x11;
-const GRYO_CTRL2_G_SET: c_int = 0b10010000;
+const GRYO_CTRL2_G_SET: c_int = 0b1010000;
 const GRYO_LSB_TO_DEGPS: f16 = 0.00875;
+
+// GRYO Scope Read
+const GRYO_OUTX_L_G: c_int = 0x22;
+const GRYO_OUTY_L_G: c_int = 0x24;
+const GRYO_OUTZ_L_G: c_int = 0x26;
 
 var ACCEL_X_TARE: f32 = 0;
 var ACCEL_Y_TARE: f32 = 0;
@@ -62,58 +63,47 @@ pub fn init_ism_imu(addr: c_int) !void {
     }
 }
 
-pub fn log_settings() !void {
+pub fn validate() !void {
     var res: c_int = c.wiringPiI2CReadReg8(FILE, ACCEL_CTRL1_XL);
-    if (res < 0) {
-        std.log.err("init_ism_imu failed to read CTRL1_XL (ACCEL) got code {d} from i2c_smbusacess", .{res});
+    if (res != ACCEL_CTRL1_XL_SET) {
+        std.log.err("init_ism_imu failed to validate CTRL1_XL (ACCEL) got code {d} from i2c_smbusacess", .{res});
         return error.InitIsmImu;
     }
     std.log.info("CTRL1_XL (ACCEL): {b}", .{res});
-    std.log.info("ACCEL_X_TARE: {d}", .{ACCEL_X_TARE});
-    std.log.info("ACCEL_Y_TARE: {d}", .{ACCEL_Y_TARE});
-    std.log.info("ACCEL_Z_TARE: {d}", .{ACCEL_Z_TARE});
 
     res = c.wiringPiI2CReadReg8(FILE, GRYO_CTRL2_G);
-    if (res < 0) {
+    if (res != GRYO_CTRL2_G_SET) {
         std.log.err("init_ism_imu failed to read CTR2_G (GRYO) got code {d} from i2c_smbusacess", .{res});
         return error.InitIsmImu;
     }
     std.log.info("CTRL2_G (GRYO): {b}", .{res});
-    std.log.info("GRYO_X_TARE: {d}", .{GRYO_X_TARE});
-    std.log.info("GRYO_Y_TARE: {d}", .{GRYO_Y_TARE});
-    std.log.info("GRYO_Z_TARE: {d}", .{GRYO_Z_TARE});
 }
 
 pub fn calibrate(n: u16) void {
-    var gx_avg: c_int = 0.0;
-    var gy_avg: c_int = 0.0;
-    var gz_avg: c_int = 0.0;
+    var gx_avg: f32 = 0.0;
+    var gy_avg: f32 = 0.0;
+    var gz_avg: f32 = 0.0;
 
-    var ax_avg: c_int = 0.0;
-    var ay_avg: c_int = 0.0;
-    var az_avg: c_int = 0.0;
+    var ax_avg: f32 = 0.0;
+    var ay_avg: f32 = 0.0;
+    var az_avg: f32 = 0.0;
     for (0..n) |_| {
-        gx_avg += c.wiringPiI2CReadReg16(FILE, GRYO_OUTX_L_G);
-        gy_avg += c.wiringPiI2CReadReg16(FILE, GRYO_OUTY_L_G);
-        gz_avg += c.wiringPiI2CReadReg16(FILE, GRYO_OUTZ_L_G);
-        ax_avg += c.wiringPiI2CReadReg16(FILE, ACCEL_OUTX_L_A);
-        ay_avg += c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A);
-        az_avg += c.wiringPiI2CReadReg16(FILE, ACCEL_OUTZ_L_A);
+        const gryo = read_gryo();
+        const accel = read_accel();
+        gx_avg += gryo.gx;
+        gy_avg += gryo.gy;
+        gz_avg += gryo.gz;
+        ax_avg += accel.ax;
+        ay_avg += accel.ay;
+        az_avg += accel.az;
     }
 
-    gx_avg = @divTrunc(gx_avg, n);
-    gy_avg = @divTrunc(gy_avg, n);
-    gz_avg = @divTrunc(gz_avg, n);
-    ax_avg = @divTrunc(ax_avg, n);
-    ay_avg = @divTrunc(ay_avg, n);
-    az_avg = @divTrunc(az_avg, n);
-
-    GRYO_X_TARE = @as(f32, @floatFromInt(gx_avg)) * GRYO_LSB_TO_DEGPS;
-    GRYO_Y_TARE = @as(f32, @floatFromInt(gy_avg)) * GRYO_LSB_TO_DEGPS;
-    GRYO_Z_TARE = @as(f32, @floatFromInt(gz_avg)) * GRYO_LSB_TO_DEGPS;
-    ACCEL_X_TARE = @as(f32, @floatFromInt(ax_avg)) * ACCEL_LSB_TO_G;
-    ACCEL_Y_TARE = @as(f32, @floatFromInt(ay_avg)) * ACCEL_LSB_TO_G;
-    ACCEL_Z_TARE = @as(f32, @floatFromInt(az_avg)) * ACCEL_LSB_TO_G - 1.0;
+    GRYO_X_TARE = gx_avg / @as(f32, @floatFromInt(n));
+    GRYO_Y_TARE = gy_avg / @as(f32, @floatFromInt(n));
+    GRYO_Z_TARE = gz_avg / @as(f32, @floatFromInt(n));
+    ACCEL_X_TARE = ax_avg / @as(f32, @floatFromInt(n));
+    ACCEL_Y_TARE = ay_avg / @as(f32, @floatFromInt(n));
+    ACCEL_Z_TARE = az_avg / @as(f32, @floatFromInt(n)) - 1.0;
 
     std.log.info("Calibration Performed on ISM330DCL", .{});
     std.log.info("GRYO_X_TARE: {d}", .{GRYO_X_TARE});
@@ -125,10 +115,10 @@ pub fn calibrate(n: u16) void {
 }
 
 pub fn is_imu_ready() struct { accel_ready: bool, gryo_ready: bool } {
-    const status: c_int = c.wiringPiI2CReadReg8(FILE, STATUS_REG);
+    const status: i8 = @truncate(c.wiringPiI2CReadReg8(FILE, STATUS_REG));
 
-    const accel_bitop: c_int = status & 1;
-    const gryo_bitop: c_int = status & 2;
+    const accel_bitop: i8 = status & 1;
+    const gryo_bitop: i8 = status & 2;
 
     return .{
         .accel_ready = accel_bitop == 1,
@@ -137,9 +127,9 @@ pub fn is_imu_ready() struct { accel_ready: bool, gryo_ready: bool } {
 }
 
 pub fn read_gryo() struct { gx: f32, gy: f32, gz: f32 } {
-    const lsb_gx: c_int = c.wiringPiI2CReadReg16(FILE, GRYO_OUTX_L_G);
-    const lsb_gy: c_int = c.wiringPiI2CReadReg16(FILE, GRYO_OUTY_L_G);
-    const lsb_gz: c_int = c.wiringPiI2CReadReg16(FILE, GRYO_OUTZ_L_G);
+    const lsb_gx: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, GRYO_OUTX_L_G));
+    const lsb_gy: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, GRYO_OUTY_L_G));
+    const lsb_gz: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, GRYO_OUTZ_L_G));
 
     return .{
         .gx = @as(f32, @floatFromInt(lsb_gx)) * GRYO_LSB_TO_DEGPS - GRYO_X_TARE,
@@ -149,9 +139,9 @@ pub fn read_gryo() struct { gx: f32, gy: f32, gz: f32 } {
 }
 
 pub fn read_accel() struct { ax: f32, ay: f32, az: f32 } {
-    const lsb_ax: c_int = c.wiringPiI2CReadReg16(FILE, ACCEL_OUTX_L_A);
-    const lsb_ay: c_int = c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A);
-    const lsb_az: c_int = c.wiringPiI2CReadReg16(FILE, ACCEL_OUTZ_L_A);
+    const lsb_ax: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTX_L_A));
+    const lsb_ay: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A));
+    const lsb_az: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A));
 
     return .{
         .ax = @as(f32, @floatFromInt(lsb_ax)) * ACCEL_LSB_TO_G - ACCEL_X_TARE,

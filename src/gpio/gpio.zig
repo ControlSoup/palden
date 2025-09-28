@@ -31,18 +31,22 @@ pub fn setup() !void {
     }
 
     try ism330dlc.init_ism_imu(IMU);
-    try ism330dlc.log_settings();
+    try ism330dlc.validate();
     ism330dlc.calibrate(500);
 
     c.pinMode(LED, c.OUTPUT);
-    res = c.softPwmCreate(PWM, 0, 100);
+
+    c.pinMode(PWM, c.OUTPUT);
+    c.digitalWrite(PWM, c.LOW);
+    res = c.softPwmCreate(PWM, 0.0, 200);
     if (res != 0) {
-        std.log.err("Unable to create a software PWM on pin {d}", .{PWM});
+        std.log.err("softPwmCreate() FAILED with code {d}", .{res});
+        return error.WiringPiSetup;
     }
 }
 
 pub fn frac_to_servo(frac: f32) c_int {
-    const command = @min(@max(frac, 0.0), 1.0) * 100;
+    const command = @min(@max(frac, 0.0), 1.0) * 200;
     return @as(c_int, @intFromFloat(command));
 }
 
@@ -51,6 +55,13 @@ pub fn update_io() void {
     const is = ism330dlc.is_imu_ready();
 
     // NOTE: ~900hz upper limit
+    if (is.gryo_ready) {
+        const gryo = ism330dlc.read_gryo();
+        buffer.write_float(.gryo_x, gryo.gx);
+        buffer.write_float(.gryo_y, gryo.gy);
+        buffer.write_float(.gryo_z, gryo.gz);
+    }
+
     if (is.accel_ready) {
         const accel = ism330dlc.read_accel();
         buffer.write_float(.accel_x, accel.ax);
@@ -58,11 +69,5 @@ pub fn update_io() void {
         buffer.write_float(.accel_z, accel.az);
     }
 
-    if (is.gryo_ready) {
-        const gryo = ism330dlc.read_gryo();
-        buffer.write_float(.gryo_x, gryo.gx);
-        buffer.write_float(.gryo_y, gryo.gy);
-        buffer.write_float(.gryo_z, gryo.gz);
-    }
     c.softPwmWrite(PWM, frac_to_servo(buffer.read_float(.servo)));
 }

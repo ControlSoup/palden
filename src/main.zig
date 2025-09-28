@@ -1,5 +1,5 @@
 const std = @import("std");
-const io = @import("io/io.zig");
+const gpio = @import("gpio/gpio.zig");
 const buffer = @import("data/buffer.zig");
 const options = @import("options.zig");
 
@@ -28,14 +28,14 @@ fn dt(timer: *std.time.Timer) f32 {
 
 pub fn main() !void {
     var timer: std.time.Timer = try std.time.Timer.start();
-    try io.setup();
+    try gpio.setup();
 
     buffer.write_float(.servo, 0.0);
 
     // ERROR FREE ZONE
     var loop_timer: std.time.Timer = try std.time.Timer.start();
     while (true) {
-        io.update_io();
+        gpio.update_io();
         buffer.write_int(.cycle_count, buffer.read_int(.cycle_count) + 1);
         buffer.write_float(.dt, dt(&timer));
         buffer.write_float(.time, time_now(&timer));
@@ -56,14 +56,8 @@ pub fn sin_centered(time: f32, time_offset: f32, center: f32, hz: f32, amp: f32)
 var s1: bool = true;
 fn loop_events() void {
     const time: f32 = buffer.read_float(.time);
+    _ = time;
 
-    if (time < 2.0) {
-        buffer.write_float(.servo, 0.2);
-    } else if (time < 2.0) {
-        buffer.write_float(.servo, 0.5);
-    } else {
-        buffer.write_float(.servo, sin_centered(time, 2.0, 0.5, 0.2, 0.5));
-    }
     buffer.record() catch |err| {
         std.log.err("{}", .{err});
     };

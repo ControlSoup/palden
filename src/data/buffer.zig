@@ -1,5 +1,6 @@
 const std = @import("std");
 const logger = @import("logger.zig");
+const buffer = @import("../data/buffer.zig");
 const fba = @import("../fba.zig");
 
 // =================================================
@@ -10,6 +11,8 @@ const fba = @import("../fba.zig");
 
 pub const INT_IDXS = enum(usize) {
     cycle_count,
+    gryo_x_lsb,
+    accel_z_lsb,
 };
 
 pub const FLOAT_IDXS = enum(usize) {
