@@ -1,8 +1,8 @@
 # Pre-Reqs
 
-### I2C
+### Install
 ```
-sudo apt-get install i2c-tools
+sudo ./install.sh
 ```
 
 Get i2c address info

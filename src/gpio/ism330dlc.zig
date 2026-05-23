@@ -141,7 +141,7 @@ pub fn read_gryo() struct { gx: f32, gy: f32, gz: f32 } {
 pub fn read_accel() struct { ax: f32, ay: f32, az: f32 } {
     const lsb_ax: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTX_L_A));
     const lsb_ay: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A));
-    const lsb_az: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTY_L_A));
+    const lsb_az: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTZ_L_A));
 
     return .{
         .ax = @as(f32, @floatFromInt(lsb_ax)) * ACCEL_LSB_TO_G - ACCEL_X_TARE,

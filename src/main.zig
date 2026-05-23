@@ -7,7 +7,7 @@ const options = @import("options.zig");
 fn time_now(timer: *std.time.Timer) f32 {
     const curr_time = timer.read();
     if (curr_time >= std.math.maxInt(u64)) {
-        std.log.err("MAX TIME HAS BEEN REACHED", .{});
+        std.log.err("MAX TIME HAS BEEN REACHED, TIME WILL LOOP TO ZERO", .{});
         timer.reset();
     }
     return @as(f32, @floatFromInt(curr_time)) * 1e-9; // ns to s
@@ -27,24 +27,32 @@ fn dt(timer: *std.time.Timer) f32 {
 }
 
 pub fn main() !void {
+    var buffer_mem: [16384]u8 = undefined; // Reserve a fixed 16kb for memory allocation
+    var fba = std.heap.FixedBufferAllocator.init(&buffer_mem);
+    const allocator = fba.allocator();
+
     var timer: std.time.Timer = try std.time.Timer.start();
     try gpio.setup();
-
-    buffer.write_float(.servo, 0.0);
 
     // ERROR FREE ZONE
     var loop_timer: std.time.Timer = try std.time.Timer.start();
     while (true) {
+        // Genreic Events
         gpio.update_io();
         buffer.write_int(.cycle_count, buffer.read_int(.cycle_count) + 1);
-        buffer.write_float(.dt, dt(&timer));
+        buffer.write_float(.dt, dt(&timer)); // NOTE: HAS TO BE BEFOR TIME UPDATE
         buffer.write_float(.time, time_now(&timer));
-        loop_events();
 
+        loop_events(allocator);
+
+        if (loop_timer.read() > options.LOOP_RATE_NS) std.log.err(
+            "Looptimer exceeding desired looprate of: {s}",
+            .{options.LOOP_RATE_NS},
+        );
         while (loop_timer.read() <= options.LOOP_RATE_NS) {}
         loop_timer.reset();
     }
-    buffer.buffer_stop_recording() catch |err| {
+    buffer.stop_recording(allocator) catch |err| {
         std.log.err("{}", .{err});
     };
 }
@@ -53,12 +61,11 @@ pub fn sin_centered(time: f32, time_offset: f32, center: f32, hz: f32, amp: f32)
     return amp * @sin((time - time_offset) * 2.0 * std.math.pi * hz) + center;
 }
 
-var s1: bool = true;
-fn loop_events() void {
+fn loop_events(allocator: std.mem.Allocator) void {
     const time: f32 = buffer.read_float(.time);
     _ = time;
 
-    buffer.record() catch |err| {
+    buffer.record(allocator) catch |err| {
         std.log.err("{}", .{err});
     };
 }

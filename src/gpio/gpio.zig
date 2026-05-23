@@ -24,7 +24,7 @@ const IMU: c_int = 0x6a;
 //
 
 pub fn setup() !void {
-    var res: c_int = c.wiringPiSetup();
+    const res: c_int = c.wiringPiSetup();
     if (res != 0) {
         std.log.err("wiringPiSetup() FAILED with code {d}", .{res});
         return error.WiringPiSetup;
@@ -35,14 +35,6 @@ pub fn setup() !void {
     ism330dlc.calibrate(500);
 
     c.pinMode(LED, c.OUTPUT);
-
-    c.pinMode(PWM, c.OUTPUT);
-    c.digitalWrite(PWM, c.LOW);
-    res = c.softPwmCreate(PWM, 0.0, 200);
-    if (res != 0) {
-        std.log.err("softPwmCreate() FAILED with code {d}", .{res});
-        return error.WiringPiSetup;
-    }
 }
 
 pub fn frac_to_servo(frac: f32) c_int {
@@ -68,6 +60,4 @@ pub fn update_io() void {
         buffer.write_float(.accel_y, accel.ay);
         buffer.write_float(.accel_z, accel.az);
     }
-
-    c.softPwmWrite(PWM, frac_to_servo(buffer.read_float(.servo)));
 }

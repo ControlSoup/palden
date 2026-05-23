@@ -1,5 +1,4 @@
 const std = @import("std");
-const fba = @import("../fba.zig");
 
 const CONFIG_FILE_NAME: []const u8 = "config/data_info.json";
 
@@ -12,7 +11,11 @@ var ID: u32 = undefined;
 var PREFIX: []const u8 = undefined;
 var DATA_FILE: std.fs.File = undefined;
 
-pub fn start_recording() !void {
+pub fn start_recording(in_allocator: std.mem.Allocator) !void {
+    var arena: std.heap.ArenaAllocator = .init(in_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
     if (IS_RECORDING) {
         std.log.err(
             "Attempted to start recording, but is already recording: {s}-{d}.csv",
@@ -29,10 +32,6 @@ pub fn start_recording() !void {
     var buffer: [50]u8 = undefined;
     const bytes_read: usize = try config_read.read(&buffer);
     config_read.close();
-
-    // Parse the contents of the config file
-    var pre_allocated = std.heap.FixedBufferAllocator.init(&fba.pre_allocated_data);
-    const allocator = pre_allocated.allocator();
 
     const parsed: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(
         std.json.Value,
@@ -51,7 +50,10 @@ pub fn start_recording() !void {
 
     // Update the current values of the data recorder
     ID = (try std.json.parseFromValue(u32, allocator, id_object, .{})).value;
-    PREFIX = (try std.json.parseFromValue([]const u8, allocator, prefix_object, .{})).value;
+
+    // Store PREFIX in persistent allocator (arena will die at end of function)
+    const prefix_value = (try std.json.parseFromValue([]const u8, allocator, prefix_object, .{})).value;
+    PREFIX = try in_allocator.dupe(u8, prefix_value);
 
     // Assemble the new file
     const start = "{";
@@ -97,8 +99,9 @@ pub fn write_line(line: []u8) !void {
     _ = try DATA_FILE.write(line);
 }
 
-pub fn stop_recording() !void {
+pub fn stop_recording(in_allocator: std.mem.Allocator) !void {
     DATA_FILE.close();
     IS_RECORDING = false;
+    in_allocator.free(PREFIX);
     std.log.info("Stopped Logging", .{});
 }

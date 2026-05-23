@@ -1,7 +1,6 @@
 const std = @import("std");
 const logger = @import("logger.zig");
 const buffer = @import("../data/buffer.zig");
-const fba = @import("../fba.zig");
 
 // =================================================
 // Buffers
@@ -17,7 +16,7 @@ pub const INT_IDXS = enum(usize) {
 
 pub const FLOAT_IDXS = enum(usize) {
     time,
-    dt, // f32 maybe to small for this??? probably not :)
+    dt, // f32 maybe to small for this??? probably not though :)
     accel_x,
     accel_y,
     accel_z,
@@ -51,9 +50,10 @@ pub fn write_float(idx: FLOAT_IDXS, val: f32) void {
 // =================================================
 
 // Header does not change, probably could just do this once at comptime???
-pub fn write_header() !void {
-    var pre_allocated = std.heap.FixedBufferAllocator.init(&fba.pre_allocated_data);
-    const allocator = pre_allocated.allocator();
+pub fn write_header(in_allocator: std.mem.Allocator) !void {
+    var arena: std.heap.ArenaAllocator = .init(in_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     var values: []u8 = try std.fmt.allocPrint(allocator, "{s}", .{std.meta.fields(INT_IDXS)[0].name});
 
@@ -68,14 +68,15 @@ pub fn write_header() !void {
     try logger.write_line(values);
 }
 
-pub fn record() !void {
-    if (!logger.is_recording()) {
-        try logger.start_recording();
-        try write_header();
-    }
+pub fn record(in_allocator: std.mem.Allocator) !void {
+    var arena: std.heap.ArenaAllocator = .init(in_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-    var pre_allocated = std.heap.FixedBufferAllocator.init(&fba.pre_allocated_data);
-    const allocator = pre_allocated.allocator();
+    if (!logger.is_recording()) {
+        try logger.start_recording(allocator);
+        try write_header(allocator);
+    }
 
     var values: []u8 = try std.fmt.allocPrint(allocator, "{d}", .{ints_data[std.meta.fields(INT_IDXS)[0].value]});
 
@@ -90,6 +91,6 @@ pub fn record() !void {
     try logger.write_line(values);
 }
 
-pub fn stop_recording() !void {
-    try logger.stop_recording();
+pub fn stop_recording(in_allocator: std.mem.Allocator) !void {
+    try logger.stop_recording(in_allocator);
 }
