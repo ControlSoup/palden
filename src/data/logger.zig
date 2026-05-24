@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 
 const CONFIG_FILE_NAME: []const u8 = "config/data_info.json";
 
@@ -9,9 +10,14 @@ pub fn is_recording() bool {
 
 var ID: u32 = undefined;
 var PREFIX: []const u8 = undefined;
-var DATA_FILE: std.fs.File = undefined;
+var DATA_FILE: Io.File = undefined;
+
+fn getIo() Io {
+    return Io.Threaded.global_single_threaded.io();
+}
 
 pub fn start_recording(in_allocator: std.mem.Allocator) !void {
+    const io = getIo();
     var arena: std.heap.ArenaAllocator = .init(in_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -25,13 +31,10 @@ pub fn start_recording(in_allocator: std.mem.Allocator) !void {
     }
 
     // Read the file
-    const config_read = try std.fs.cwd().openFile(
-        CONFIG_FILE_NAME,
-        .{ .mode = .read_write },
-    );
+    const config_file = try Io.Dir.cwd().openFile(io, CONFIG_FILE_NAME, .{ .mode = .read_write });
+    defer config_file.close(getIo());
     var buffer: [50]u8 = undefined;
-    const bytes_read: usize = try config_read.read(&buffer);
-    config_read.close();
+    const bytes_read: usize = try config_file.readPositionalAll(io, &buffer, 0);
 
     const parsed: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(
         std.json.Value,
@@ -65,30 +68,12 @@ pub fn start_recording(in_allocator: std.mem.Allocator) !void {
     );
 
     // Re-write the file with the new index
-    const config_write = try std.fs.cwd().createFile(
-        CONFIG_FILE_NAME,
-        .{},
-    );
-    defer config_write.close();
-    const written_bytes = try config_write.write(new_file);
+    const config_write = try Io.Dir.cwd().createFile(getIo(), CONFIG_FILE_NAME, .{});
+    defer config_write.close(getIo());
+    try config_write.writeStreamingAll(getIo(), new_file);
 
-    if (written_bytes != new_file.len) {
-        std.log.err(
-            "Written bytes does not match new file length (data_info.json) [{d}] vs [{d}]",
-            .{ written_bytes, new_file.len },
-        );
-        return error.FileWriteError;
-    }
-
-    DATA_FILE = try std.fs.cwd().createFile(
-        try std.fmt.allocPrint(
-            allocator,
-            "data/{s}-{d}.csv",
-            .{ PREFIX, ID },
-        ),
-        .{ .exclusive = true },
-    );
-    _ = try DATA_FILE.write("");
+    DATA_FILE = try Io.Dir.cwd().createFile(getIo(), try std.fmt.allocPrint(allocator, "data/{s}-{d}.csv", .{ PREFIX, ID }), .{ .exclusive = true });
+    try DATA_FILE.writeStreamingAll(getIo(), "");
 
     IS_RECORDING = true;
 
@@ -96,11 +81,11 @@ pub fn start_recording(in_allocator: std.mem.Allocator) !void {
 }
 
 pub fn write_line(line: []u8) !void {
-    _ = try DATA_FILE.write(line);
+    try DATA_FILE.writeStreamingAll(getIo(), line);
 }
 
 pub fn stop_recording(in_allocator: std.mem.Allocator) !void {
-    DATA_FILE.close();
+    DATA_FILE.close(getIo());
     IS_RECORDING = false;
     in_allocator.free(PREFIX);
     std.log.info("Stopped Logging", .{});

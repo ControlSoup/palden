@@ -21,3 +21,15 @@ case "$1" in
         zig build --release=fast && mv zig-out/bin/palden . && rm -rf zig-out/
         ;;
 esac
+
+cp palden /home/jowilson/palden_sshfs/mount/home/palden/
+echo "Copied to /home/jowilson/palden_sshfs/mount/home/palden/"
+
+if [ ! -f "/home/jowilson/palden_sshfs/mount/home/palden/install_deps.sh" ]; then
+    cp install_deps.sh /home/jowilson/palden_sshfs/mount/home/palden/
+    echo "Copied install_deps.sh"
+fi
+
+mkdir -p /home/jowilson/palden_sshfs/mount/home/palden/config
+mkdir -p /home/jowilson/palden_sshfs/mount/home/palden/data
+cp -n config/data_info.json /home/jowilson/palden_sshfs/mount/home/palden/config/ 2>/dev/null || true

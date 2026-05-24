@@ -16,9 +16,10 @@ const ACCEL_OUTZ_L_A: c_int = 0x2C;
 const STATUS_REG: c_int = 0x1E;
 
 // Accelerometer Settings (4g)
+const STD_G: f16 = 9.8055;
 const ACCEL_CTRL1_XL: c_int = 0x10;
 const ACCEL_CTRL1_XL_SET: c_int = 0b10101000;
-const ACCEL_LSB_TO_G: f16 = 0.000122;
+const ACCEL_LSB_TO_MPS2: f16 = 0.000122 * STD_G;
 
 const ACCEL_X_OFS_USR: c_int = 0x73;
 const ACCEL_Y_OFS_USR: c_int = 0x74;
@@ -103,7 +104,7 @@ pub fn calibrate(n: u16) void {
     GRYO_Z_TARE = gz_avg / @as(f32, @floatFromInt(n));
     ACCEL_X_TARE = ax_avg / @as(f32, @floatFromInt(n));
     ACCEL_Y_TARE = ay_avg / @as(f32, @floatFromInt(n));
-    ACCEL_Z_TARE = az_avg / @as(f32, @floatFromInt(n)) - 1.0;
+    ACCEL_Z_TARE = az_avg / @as(f32, @floatFromInt(n)) - STD_G;
 
     std.log.info("Calibration Performed on ISM330DCL", .{});
     std.log.info("GRYO_X_TARE: {d}", .{GRYO_X_TARE});
@@ -144,8 +145,8 @@ pub fn read_accel() struct { ax: f32, ay: f32, az: f32 } {
     const lsb_az: i16 = @truncate(c.wiringPiI2CReadReg16(FILE, ACCEL_OUTZ_L_A));
 
     return .{
-        .ax = @as(f32, @floatFromInt(lsb_ax)) * ACCEL_LSB_TO_G - ACCEL_X_TARE,
-        .ay = @as(f32, @floatFromInt(lsb_ay)) * ACCEL_LSB_TO_G - ACCEL_Y_TARE,
-        .az = @as(f32, @floatFromInt(lsb_az)) * ACCEL_LSB_TO_G - ACCEL_Z_TARE,
+        .ax = @as(f32, @floatFromInt(lsb_ax)) * ACCEL_LSB_TO_MPS2 - ACCEL_X_TARE,
+        .ay = @as(f32, @floatFromInt(lsb_ay)) * ACCEL_LSB_TO_MPS2 - ACCEL_Y_TARE,
+        .az = @as(f32, @floatFromInt(lsb_az)) * ACCEL_LSB_TO_MPS2 - ACCEL_Z_TARE,
     };
 }

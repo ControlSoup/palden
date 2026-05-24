@@ -18,9 +18,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    exe.root_module.link_objects.append(b.allocator, .{
-        .static_path = .{ .cwd_relative = "libwiringPi.so" },
-    });
+    exe.root_module.link_libc = true;
+    exe.root_module.addIncludePath(.{ .cwd_relative = "/home/jowilson/palden_sshfs/mount/usr/include" });
+    exe.root_module.addLibraryPath(.{ .cwd_relative = "." });
+    exe.root_module.linkSystemLibrary("wiringPi", .{});
 
     b.installArtifact(exe);
 }

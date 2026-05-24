@@ -10,8 +10,7 @@ const buffer = @import("../data/buffer.zig");
 
 pub const INT_IDXS = enum(usize) {
     cycle_count,
-    gryo_x_lsb,
-    accel_z_lsb,
+    led_01,
 };
 
 pub const FLOAT_IDXS = enum(usize) {

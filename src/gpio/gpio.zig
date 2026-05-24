@@ -60,4 +60,7 @@ pub fn update_io() void {
         buffer.write_float(.accel_y, accel.ay);
         buffer.write_float(.accel_z, accel.az);
     }
+
+    const led_val = buffer.read_int(.led_01);
+    c.digitalWrite(LED, if (led_val != 0) c.HIGH else c.LOW);
 }
